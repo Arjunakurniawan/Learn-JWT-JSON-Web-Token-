@@ -1,11 +1,13 @@
 import express from "express";
 import dotenv from "dotenv";
 import jwt from "jsonwebtoken";
+import cookieParser from "cookie-parser";
 
 dotenv.config();
 const JWT_SECRET = process.env.JWT_SECRET as string;
 
 const app = express();
+app.use(cookieParser());
 app.use(express.json());
 
 // ==========================================
@@ -32,9 +34,14 @@ app.post("/login", async (req: express.Request, res: express.Response) => {
 
   const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "1h" });
 
+  res.cookie("authCookie", token, {
+    httpOnly: true,
+    secure: false,
+    maxAge: 3600000,
+  });
+
   res.json({
-    message: "login successful",
-    token: token,
+    message: "login successful, check your cookie",
   });
 });
 
@@ -46,20 +53,25 @@ const authenticateToken = (
   res: express.Response,
   next: express.NextFunction,
 ) => {
-  const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1];
+  // mengambil token dari cookie
+  const token = req.cookies.authCookie;
 
   if (!token) {
     return res.status(401).json({ message: "Token not provided" });
   }
 
-  jwt.verify(token, JWT_SECRET, (err: jwt.VerifyErrors | null, decodedUser) => {
-    if (err) {
-      return res.status(403).json({ message: "Invalid token" });
-    }
-    (req as any).user = decodedUser;
-    next();
-  });
+  jwt.verify(
+    token,
+    JWT_SECRET,
+    (err: jwt.VerifyErrors | null, decodedUser: any) => {
+      if (err) {
+        return res.status(403).json({ message: "Invalid token" });
+      }
+
+      (req as any).user = decodedUser;
+      next();
+    },
+  );
 };
 
 // ==========================================
