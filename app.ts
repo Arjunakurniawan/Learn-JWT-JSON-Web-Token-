@@ -2,6 +2,7 @@ import express from "express";
 import dotenv from "dotenv";
 import jwt from "jsonwebtoken";
 import cookieParser from "cookie-parser";
+import { authMiddleware } from "./middleware.ts";
 
 dotenv.config();
 const JWT_SECRET = process.env.JWT_SECRET as string;
@@ -9,6 +10,7 @@ const JWT_SECRET = process.env.JWT_SECRET as string;
 const app = express();
 app.use(cookieParser());
 app.use(express.json());
+app.use(authMiddleware);
 
 // ==========================================
 // 1. DATA USER (Sementara, nanti bisa diganti dengan database)
@@ -21,7 +23,7 @@ const users = [
 // ==========================================
 // 2. ENDPOINT LOGIN (Pabrik Bikin JWT)
 // ==========================================
-app.post("/login", async (req: express.Request, res: express.Response) => {
+app.post("/login", async (req, res) => {
   const { username, password } = req.body;
   const user = users.find(
     (u) => u.username === username && u.password === password,
@@ -43,48 +45,21 @@ app.post("/login", async (req: express.Request, res: express.Response) => {
   res.json({
     message: "login successful, check your cookie",
   });
+  console.log(`Generated JWT for user ${user.username}: ${token}`);
 });
-
-// ==========================================
-// 3. MIDDELWARE AUTHENTICATION (Pabrik Cek JWT)
-// ==========================================
-const authenticateToken = (
-  req: express.Request,
-  res: express.Response,
-  next: express.NextFunction,
-) => {
-  // mengambil token dari cookie
-  const token = req.cookies.authCookie;
-
-  if (!token) {
-    return res.status(401).json({ message: "Token not provided" });
-  }
-
-  jwt.verify(
-    token,
-    JWT_SECRET,
-    (err: jwt.VerifyErrors | null, decodedUser: any) => {
-      if (err) {
-        return res.status(403).json({ message: "Invalid token" });
-      }
-
-      (req as any).user = decodedUser;
-      next();
-    },
-  );
-};
 
 // ==========================================
 // 4. ENDPOINT TEST
 // ==========================================
-app.get(
-  "/profile",
-  authenticateToken,
-  (req: express.Request, res: express.Response) => {
-    const user = (req as any).user;
-    res.json({ message: "Welcome To Secret Area", Data: user });
-  },
-);
+app.get("/profile", (req, res) => {
+  const userId = req.user.id;
+  
+  //tidak menampilkan password di response
+  const { password, ...loggedInUser } =
+    users.find((u) => u.id === userId) ?? {};
+
+  res.json({ message: "welcome to your profile", data: loggedInUser });
+});
 
 app.listen(3000, () => {
   console.log("Server is running on port 3000");
