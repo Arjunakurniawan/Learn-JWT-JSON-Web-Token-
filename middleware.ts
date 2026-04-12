@@ -24,8 +24,6 @@ export const authMiddleware = (
     return res.status(401).json({ message: "Token not provided" });
   }
 
- 
-
   jwt.verify(
     token,
     JWT_SECRET,
